@@ -20,7 +20,7 @@ param.miniSize = 300; % mini-batch size
 
 
 
-cd ~/Desktop/code/sandbox
+% cd ~/Desktop/code/sandbox
 
 % load_features;
 % load_queries;
