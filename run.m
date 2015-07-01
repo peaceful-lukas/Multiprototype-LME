@@ -1,29 +1,21 @@
 
+param.algorithm = 'lme_mp';
 param.numClasses = 20;
 param.lowDim = 100;
 param.featureDim = 4096;
 param.maxIterW = 1000;
 param.maxIterU = 1000;
 param.maxAlter = 5;
-param.lr_W = 0.01; % learning rate for W
-param.lr_U = 0.0001; % learning rate for U
-param.c_LM = 100; % large margin for classification
-param.sp_LM = 10; % large margin for structure preserving
-param.lambda = 1; % regularizer coefficient
-param.bal_c = 1; % balance term for classification loss
+param.lr_W = 0.1; % learning rate for W
+param.lr_U = 0.001; % learning rate for U
+param.c_LM = 0.1; % large margin for classification
+param.sp_LM = 0.01; % large margin for structure preserving
+param.lambda = 1000; % regularizer coefficient
+param.bal_c = 5; % balance term for classification loss
 param.bal_sp = 1; % balance term for structure preserving loss
+param.softmax_c = 100; % softmax parameter.
 param.miniSize = 300; % mini-batch size
 
-% param.epsilon = []; % threshold for adjacency matricies in original space.
-% param.epsilon(1) = 2500;
-% param.epsilon(2) = 2000;
-% param.epsilon(3) = 2000;
-% param.epsilon(4) = 2000;
-% param.epsilon(5) = 1500;
-% param.epsilon(6) = 1500;
-% param.epsilon(7) = 1500;
-% param.epsilon(8) = 1700;
-% param.epsilon(9) = 2000;
 
 
 
@@ -56,8 +48,6 @@ for n=1:numClasses
 end
 toc
 clear assignments centroids labels_per_class D_per_class n;
-
-
 
 
 
@@ -101,32 +91,53 @@ toc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Optimizaiton %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % randomly initialize W and U
-lowDim = param.lowDim;
-featureDim = param.featureDim;
-
-W = rand(lowDim, featureDim);
-W = normc(W);
-
-U = rand(lowDim, featureDim);
-U = normc(U);
-clear lowDim featureDim
-
+if strcmp(param.algorithm, 'ours') == 1 | strcmp(param.algorithm, 'lme_mp') == 1
+    lowDim = param.lowDim;
+    featureDim = param.featureDim;
+    W = randn(lowDim, featureDim);
+    U = randn(lowDim, featureDim);
+    W = W/norm(W, 'fro');
+    U = U/norm(U, 'fro');
+    clear lowDim featureDim
+elseif strcmp(param.algorithm, 'lme_sp') == 1
+    lowDim = param.lowDim;
+    featureDim = param.featureDim;
+    W = randn(lowDim, featureDim);
+    U = randn(lowDim, numClasses);
+    clear lowDim featureDim
+end
 
 % alternate learning for W and U.
+fprintf('\n\n>>> ALGORITHM : %s <<< \n\n', param.algorithm);
 n = 0;
 while( n < param.maxAlter )
     n = n + 1;
-    fprintf('\n\n============================= Iteration %d =============================\n', n);
+    fprintf('\n============================= Iteration %d =============================\n', n);
 
-    % param.lr_W = param.lr_W * exp(-n);
-    % param.lr_U = param.lr_U * exp(-n);
-    W = learnW_new(DS, W, U, M, A, param);
-    U = learnU_new(DS, W, U, M, A, param);
+    if n <= 5
+        param.lr_W = param.lr_W * 0.5;
+        param.lr_U = param.lr_U * 0.5;
+    end
+
+    if strcmp(param.algorithm, 'ours') == 1
+        W = learnW_ours(DS, W, U, M, A, param);
+        U = learnU_ours(DS, W, U, M, A, param);
+    
+    elseif strcmp(param.algorithm, 'lme_mp') == 1
+        % W = learnW_lme_mp(DS, W, U, M, param);
+        W = learnW_lme_mp_complete(DS, W, U, M, param);
+        U = learnU_lme_mp(DS, W, U, M, param);
+    
+    elseif strcmp(param.algorithm, 'lme_sp') == 1
+        W = learnW_lme_sp(DS, W, U, param);
+        U = learnU_lme_sp(DS, W, U, param);
+    end
 end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Draw Embeddings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% As it is
 E_whole = [];
 E = {};
 for alpha=1:numClasses
@@ -137,15 +148,32 @@ embeddings = E_whole;
 clear alpha;
 
 
+% SVD
+embeddings = [];
+for alpha=1:numClasses
+    UM = U*M{alpha};
+    [UU SS VV] = svd(UM);
+    
+    SS(:, 4:end) = [];
+    VV(:, 4:end) = [];
+
+    % SS(4:end, 4:end) = 0;
+    UM = UU*SS*VV';
+    % keyboard;
+    embeddings = [embeddings UM(1:3, :)];
+end
+clear alpha;
+
+% Draw figure
 figure;
 hold on;
-box on; grid on; axis tight; daspect([1 1 1])
+box on; grid on; axis tight; daspect([1 1 1]);
 view(3); camproj perspective
 camlight; lighting gouraud; alpha(0.75);
 rotate3d on;
 
 for n=1:numClasses
-    range = (n-1)*numClasses+1:n*numClasses;
+    range = (n-1)*10+1:n*10;
     scatter3(embeddings(1,range),embeddings(2,range), embeddings(3,range), 60, 'filled'); axis equal;
     
     drawnow;
@@ -156,47 +184,130 @@ end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-E_whole = [];
-E = {};
-for alpha=1:numClasses
-    E{alpha} = U*M{alpha};
-    E_whole = [E_whole E{alpha}];
-end
-
 TX = DS.T;
 T_labels = DS.TL;
 
 
-accuracy = 0;
-for n=1:size(TX, 2)
-    
-    max_sim = -Inf;
-    max_class = -1;
-    q_i = TX(:, n);
+hits = {};
+misses = {};
+accuracies = {};
+for alpha=1:numClasses
+    hits{alpha} = [];
+    misses{alpha} = [];
+    accuracies{alpha} = 0;
+end
 
-    for alpha=1:numClasses
-        UM = U*M{alpha};
-        sim = max(q_i'*W'*UM);
 
-        if max_sim < sim
-            max_sim = sim;
-            max_class = alpha;
+if strcmp(param.algorithm, 'lme_sp') == 1 %% LME SINGLE-PROTOTYPE
+    accuracy = 0;
+
+    for n=1:size(TX, 2)
+        
+        q_i = TX(:, n);
+        [~, max_class] = max(q_i'*W'*U);
+
+        if max_class == T_labels(n)
+            accuracy = accuracy + 1;
+            accuracies{max_class} = accuracies{max_class} + 1;
+            hits{max_class} = [hits{max_class} n];
+        else
+            % misses{max_class} = [misses{max_class} n];
+            misses{T_labels(n)} = [misses{T_labels(n)} n];
+        %     fprintf('%d th query is categorized as %d (ground truth: %d)\n', n, max_class, T_labels(n));
+        end
+
+        if mod(n, 1000) == 0
+            fprintf('.');
         end
     end
 
-    if max_class == T_labels(n)
-        accuracy = accuracy + 1;
-    else
-        fprintf('%d th query is categorized as %d (ground truth: %d)\n', n, max_class, T_labels(n));
+    accuracy = double(accuracy) * 100 / size(T_labels, 1);
+    fprintf('accuracy : %f\n', accuracy);
+
+
+    category_size = {};
+    for alpha=1:numClasses
+        category_size{alpha} = numel(find(T_labels == alpha));
+        accuracies{alpha} = double(accuracies{alpha}) * 100 / category_size{alpha};
+    end
+   
+
+else %% OUR MODELS | LME MULTI-PROTOTYPE
+    accuracy = 0;
+
+    for n=1:size(TX, 2)
+        
+        max_sim = -Inf;
+        max_class = -1;
+        q_i = TX(:, n);
+
+        for alpha=1:numClasses
+            UM = U*M{alpha};
+            sim = max(q_i'*W'*UM);
+
+            if max_sim < sim
+                max_sim = sim;
+                max_class = alpha;
+            end
+        end
+
+        if max_class == T_labels(n)
+            accuracy = accuracy + 1;
+            accuracies{max_class} = accuracies{max_class} + 1;
+            hits{max_class} = [hits{max_class} n];
+        else
+            % misses{max_class} = [misses{max_class} n];
+            misses{T_labels(n)} = [misses{T_labels(n)} n];
+        %     fprintf('%d th query is categorized as %d (ground truth: %d)\n', n, max_class, T_labels(n));
+        end
+
+        if mod(n, 1000) == 0
+            fprintf('.');
+        end
+    end
+
+    accuracy = double(accuracy) * 100 / size(T_labels, 1);
+    fprintf('accuracy : %f\n', accuracy);
+
+
+    category_size = {};
+    for alpha=1:numClasses
+        category_size{alpha} = numel(find(T_labels == alpha));
+        accuracies{alpha} = double(accuracies{alpha}) * 100 / category_size{alpha};
     end
 end
 
-accuracy = double(accuracy) * 100 / size(T_labels, 1);
-fprintf('accuracy : %f\n', accuracy);
 
 
 
 
 
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Show Results %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+I = DS.TI;
+
+alpha = 3; % category
+target_imgs = misses{alpha};
+fig = figure;
+hold on;
+
+set(fig, 'Position', [0, 0, 1500, 1200]);
+
+numRows = 8;
+numCols = 10;
+for row=1:numRows
+    for col=1:numCols
+        pos_idx = (row-1)*numCols + col;
+        img_idx = target_imgs(pos_idx);
+        
+        subplot(numRows, numCols, pos_idx);
+        imagesc(I{1, img_idx});
+        axis off;
+        axis image;
+    end
+end
+hold off;
+
+clear numRow, numCols;

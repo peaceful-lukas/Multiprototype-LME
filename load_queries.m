@@ -6,11 +6,11 @@ data = dir('*.mat');
 % load labels.
 load(strcat('~/Desktop/code/caffe_features/test/',data(14977).name));
 data(14977) = [];
-T_labels = labels(1:1000);
+T_labels = labels;
 
 % % load features.
 tic
-for n=1:1000
+for n=1:numel(data)
     load(data(n).name);
     T = [T feat'];
 end

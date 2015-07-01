@@ -1,24 +1,23 @@
-function W = learnW(DS, W, U, M, A, param)
+function U = learnU_lme_mp(DS, W, U, M, param)
 
     n = 0;
-
-    spTriplets = generateStructurePreservingTriplets(DS, W, U, M, A, param);    
+    
     % all_cTriplets = generateAllClassifierTriplets(DS, W, U, M, param);
     all_cTriplets = [];
 
     tic;
-    while(n < param.maxIterW)
+    while(n < param.maxIterU)
         n = n + 1;
-        
+
         cTriplets = generateClassifierTriplets(DS, W, U, M, param);
 
-        dW = getGradient(DS, W, U, M, cTriplets, param);
-        W = update(W, dW, param.lr_W/(1 + n * param.lr_W));
-        % W = update(W, dW, param.lr_W);
-        
+        dU = getGradient(DS, W, U, M, cTriplets, param);
+        U = update(U, dU, param.lr_U/(1 + n * param.lr_U));
+        % U = update(U, dU, param.lr_U);
+
         if mod(n, 100) == 0
-            fprintf('W) iter %d / ', n);
-            loss = getSampleLoss(DS, W, U, M, all_cTriplets, spTriplets, param);
+            fprintf('U) iter %d / ', n);
+            loss = getSampleLoss(DS, W, U, M, all_cTriplets, param);
             tic;
         end
     end
@@ -28,14 +27,13 @@ end
 
 
 
-function W = update(W, dW, learning_rate)
-    W = W - learning_rate * dW;
+function U = update(U, dU, learning_rate)
+    U = U - learning_rate * dU;
 end
 
 
 
-function dW = getGradient(DS, W, U, M, cTriplets, param)
-    % getGradient() assumes that all the triplets are valid. 
+function dU = getGradient(DS, W, U, M, cTriplets, param)
 
     X = DS.D;
     bal_c = param.bal_c;
@@ -43,7 +41,9 @@ function dW = getGradient(DS, W, U, M, cTriplets, param)
     lowDim = param.lowDim;
     featureDim = param.featureDim;
 
-    dW = zeros(lowDim, featureDim);
+    
+    % gradient for the first term in the objective differential.
+    dU = zeros(lowDim, featureDim);
     for n=1:size(cTriplets, 1)
         i = cTriplets(n, 1);
         y_i = cTriplets(n, 2);
@@ -57,18 +57,19 @@ function dW = getGradient(DS, W, U, M, cTriplets, param)
         k = floor(size(M{alpha}, 2)/2);
         k_prime = floor(size(M{y_i}, 2)/2);
 
-        dW = dW + U*(M{alpha}(:, k) - M{y_i}(:, k_prime))*x_i';
+        dU = dU + W*x_i*(M{alpha}(:, k) - M{y_i}(:, k_prime))';
     end
 
-    if( size(cTriplets, 1) > 0 )
-        dW = bal_c*dW/size(cTriplets, 1) + lambda*W/size(W, 2);
+    if (size(cTriplets, 1) > 0)
+        dU = bal_c*dU/size(cTriplets, 1) + lambda*U/size(U, 2);
     else
-        dW = lambda*W/size(W, 2);
+        dU = lambda*U/size(U, 2);
     end
 end
 
 
-function loss = getSampleLoss(DS, W, U, M, cTriplets, spTriplets, param)
+
+function loss = getSampleLoss(DS, W, U, M, cTriplets, param)
 
     loss = 0;
     
@@ -104,28 +105,11 @@ function loss = getSampleLoss(DS, W, U, M, cTriplets, spTriplets, param)
         cErr = cErr / size(cTriplets, 1);
     end
 
-    % sum of the structure preserving errors
-    spErr = 0;
-    spViolCount = 0;
-    for alpha=1:numClasses
-        for n=1:size(spTriplets{alpha}, 1)
-            k = spTriplets{alpha}(n, 1);
-            k_prime = spTriplets{alpha}(n, 2);
-            l = spTriplets{alpha}(n, 3);
 
-            val = sp_LM + M{alpha}(:, k)'*U'*U*M{alpha}(:, l) - M{alpha}(:, k)'*U'*U*M{alpha}(:, k_prime);
-
-            spErr = spErr + val;
-        end
-        spViolCount = spViolCount + size(spTriplets{alpha}, 1);
-    end
-    if spViolCount > 0
-        spErr = spErr / spViolCount;
-    end
-
-    loss = bal_c*cErr + bal_sp*spErr + lambda*0.5*(norm(W, 'fro')^2/size(W, 2) + norm(U, 'fro')^2)/size(U, 2);
-    fprintf('cViol: %d / spViol: %d / loss: %f / cErr: %f / spErr: %f / nomrW: %f / normU: %f / elapsed time: %f\n', size(cTriplets, 1), spViolCount, loss, cErr, spErr, norm(W, 'fro'), norm(U, 'fro'), toc);
+    loss = bal_c*cErr + lambda*0.5*(norm(W, 'fro')^2/size(W, 2) + norm(U, 'fro')^2)/size(U, 2);
+    fprintf('cViol: %d / loss: %f / cErr: %f / nomrW: %f / normU: %f / elapsed time: %f\n', size(cTriplets, 1), loss, cErr, norm(W, 'fro'), norm(U, 'fro'), toc);
 end
+
 
 function cTriplets = generateAllClassifierTriplets(DS, W, U, M, param)
     D_labels = DS.DL;
@@ -195,5 +179,3 @@ function cTriplets = getValidClassifierTriplets(DS, W, U, M, cTriplets, param)
     
     cTriplets = cTriplets(valids, :);
 end
-
-
