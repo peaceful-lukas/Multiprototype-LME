@@ -37,32 +37,32 @@ numClasses = param.numClasses;
 % Clustering
 %% clustering per classes by CRP (but now, K-Means)
 load clustered.mat
-tic
-M = {};
-for n=1:numClasses
-    labels_per_class = find(D_labels == n);
-    D_per_class = D(:, labels_per_class);
+% tic
+% M = {};
+% for n=1:numClasses
+%     labels_per_class = find(D_labels == n);
+%     D_per_class = D(:, labels_per_class);
     
-    [assignments centroids] = kmeans(D_per_class', 10, 'Display', 'iter');
-    M{n} = centroids';
-end
-toc
-clear assignments centroids labels_per_class D_per_class n;
+%     [assignments centroids] = kmeans(D_per_class', 10, 'Display', 'iter');
+%     M{n} = centroids';
+% end
+% toc
+% clear assignments centroids labels_per_class D_per_class n;
 
 
 
-% Adjacency matrices of k-NN graphs for each category.
-tic
-% knn-based graph
-A = {};
-for n=1:numClasses
-    A{n} = knn_graph(M{n}, 2);
-    val = is_connected_graph(A{n});
-    % fprintf('%d-th graph is connected? %d\n', n, val);
-    % imagesc(A{n});
-    % pause
-end
-toc
+% % Adjacency matrices of k-NN graphs for each category.
+% tic
+% % knn-based graph
+% A = {};
+% for n=1:numClasses
+%     A{n} = knn_graph(M{n}, 2);
+%     val = is_connected_graph(A{n});
+%     % fprintf('%d-th graph is connected? %d\n', n, val);
+%     % imagesc(A{n});
+%     % pause
+% end
+% toc
 
 
 % epsilon-based nearest neighbors graph.

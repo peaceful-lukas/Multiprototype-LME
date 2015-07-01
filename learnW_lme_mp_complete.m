@@ -5,8 +5,8 @@ function W = learnW_lme_mp_complete(DS, W, U, M, param)
     % all_cTriplets = generateAllClassifierTriplets(DS, W, U, M, param);
     all_cTriplets = [];
 
-    tic;
     while(n < param.maxIterW)
+        tic
         n = n + 1;
         
         cTriplets = generateClassifierTriplets(DS, W, U, M, param);
@@ -14,13 +14,12 @@ function W = learnW_lme_mp_complete(DS, W, U, M, param)
         W = update(W, dW, param.lr_W/(1 + n * param.lr_W));
         % W = update(W, dW, param.lr_W);
         
-        if mod(n, 100) == 0
-            fprintf('W) iter %d / ', n);
-            loss = getSampleLoss(DS, W, U, M, all_cTriplets, param);
-            tic;
-        end
+        % if mod(n, 100) == 0
+        %     fprintf('W) iter %d / ', n);
+        %     loss = getSampleLoss(DS, W, U, M, all_cTriplets, param);
+        % end
+        toc
     end
-
 
 end
 
