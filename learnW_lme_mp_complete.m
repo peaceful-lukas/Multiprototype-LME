@@ -44,44 +44,21 @@ function dW = getGradient(DS, W, U, M, cTriplets, param)
 
     tripletsIdx = 1:size(cTriplets, 1);
     
-    %% A
-    A = arrayfun(@(n) sum(exp(softmax_c*X(:, cTriplets(n, 1))'*W'*U*M{cTriplets(n, 3)})), tripletsIdx);
+
+    % A = arrayfun(@(n) sum(exp(softmax_c*X(:, cTriplets(n, 1))'*W'*U*M{cTriplets(n, 3)})), tripletsIdx);
     
-    % B_k = a + c = a + b.*a
-    a = arrayfun(@(n) exp(softmax_c*X(:, cTriplets(n, 1))'*W'*U*M{cTriplets(n, 3)}), tripletsIdx, 'UniformOutput', false);
-    b = arrayfun(@(n) (softmax_c*X(:, cTriplets(n, 1))'*W'*U*M{cTriplets(n, 3)}), tripletsIdx, 'UniformOutput', false);
-    c = cellfun(@times, b, a, 'UniformOutput', false);
-    B_k = cellfun(@plus, a, c, 'UniformOutput', false); % (1 x 293)[1x10]
-    
-    B_grad_k = arrayfun(@(n) arrayfun(@(k) U*M{cTriplets(n, 3)}(:, k)*X(:, cTriplets(n, 1))', 1:size(M{cTriplets(n, 3)}, 2), 'UniformOutput', false), tripletsIdx, 'UniformOutput', false);
-
-    n = 1;
-    B = arrayfun(@(n) cellfun(@times, B_k(n), B_grad_k{n}, 'UniformOutput', false), tripletsIdx);
-    
-
-    % alpha = 1;
-    % i = 1;
-    % arrayfun(@(k) U*M{alpha}(:, k)*X(:, i)', 1:size(M{alpha}, 2), 'UniformOutput', false)
+    % a = arrayfun(@(n) exp(softmax_c*X(:, cTriplets(n, 1))'*W'*U*M{cTriplets(n, 3)}), tripletsIdx, 'UniformOutput', false);
+    % b = arrayfun(@(n) (softmax_c*X(:, cTriplets(n, 1))'*W'*U*M{cTriplets(n, 3)}), tripletsIdx, 'UniformOutput', false);
+    % c = cellfun(@times, b, a, 'UniformOutput', false);
+    % B_k = cellfun(@plus, a, c, 'UniformOutput', false); % (1 x 293)[1x10]    
+    % B_grad_k = arrayfun(@(n) arrayfun(@(k) U*M{cTriplets(n, 3)}(:, k)*X(:, cTriplets(n, 1))', 1:size(M{cTriplets(n, 3)}, 2), 'UniformOutput', false), tripletsIdx, 'UniformOutput', false);
 
 
-
-    % temp_perm = cell2mat(permute(temp, [3 1 2]))
-
-
-    % % arrayfun(@(n) n, 1:size(cTriplets, 1))
-    % arrayfun(@(trip) trip, cTriplets(1, :))
-    % sum(exp(softmax_c*X(:, trip(1))'*W'*U*M{trip(3)}))
-
-    X = c*x_i'*W'*U*M_alpha;
-    f_temp = c*exp(X);
-    f_grad_k = arrayfun(@(k)(f_temp(k)*U*M_alpha(:, k)*x_i'), 1:size(M_alpha, 2), 'UniformOutput', false);
-    f_grad_k_cat = cat(3, f_grad_k{:});
-    f_grad = sum(f_grad_k_cat, 3);
-
-
+    %%%%%%%%%%%%%% NOT WORKING
+    % n = 1
+    % B = arrayfun(@(n) cellfun(@times, B_k(n), B_grad_k{n}, 'UniformOutput', false), tripletsIdx);
     %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    tic
     dW = zeros(lowDim, featureDim);
     for n=1:size(cTriplets, 1)
         i = cTriplets(n, 1);
@@ -91,7 +68,6 @@ function dW = getGradient(DS, W, U, M, cTriplets, param)
 
         dW = dW + softmaxGradient(W, U, x_i, M{alpha}, param) - softmaxGradient(W, U, x_i, M{y_i}, param);    
     end
-    toc
     
     if (size(cTriplets, 1) > 0)
         dW = bal_c*dW/size(cTriplets, 1) + lambda*W/size(W, 2);
