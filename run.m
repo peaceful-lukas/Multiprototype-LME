@@ -135,179 +135,179 @@ while( n < param.maxAlter )
 end
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Draw Embeddings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Draw Embeddings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% As it is
-E_whole = [];
-E = {};
-for alpha=1:numClasses
-    E{alpha} = U*M{alpha};
-    E_whole = [E_whole E{alpha}];
-end
-embeddings = E_whole;
-clear alpha;
+% % As it is
+% E_whole = [];
+% E = {};
+% for alpha=1:numClasses
+%     E{alpha} = U*M{alpha};
+%     E_whole = [E_whole E{alpha}];
+% end
+% embeddings = E_whole;
+% clear alpha;
 
 
-% SVD
-embeddings = [];
-for alpha=1:numClasses
-    UM = U*M{alpha};
-    [UU SS VV] = svd(UM);
+% % SVD
+% embeddings = [];
+% for alpha=1:numClasses
+%     UM = U*M{alpha};
+%     [UU SS VV] = svd(UM);
     
-    SS(:, 4:end) = [];
-    VV(:, 4:end) = [];
+%     SS(:, 4:end) = [];
+%     VV(:, 4:end) = [];
 
-    % SS(4:end, 4:end) = 0;
-    UM = UU*SS*VV';
-    % keyboard;
-    embeddings = [embeddings UM(1:3, :)];
-end
-clear alpha;
+%     % SS(4:end, 4:end) = 0;
+%     UM = UU*SS*VV';
+%     % keyboard;
+%     embeddings = [embeddings UM(1:3, :)];
+% end
+% clear alpha;
 
-% Draw figure
-figure;
-hold on;
-box on; grid on; axis tight; daspect([1 1 1]);
-view(3); camproj perspective
-camlight; lighting gouraud; alpha(0.75);
-rotate3d on;
+% % Draw figure
+% figure;
+% hold on;
+% box on; grid on; axis tight; daspect([1 1 1]);
+% view(3); camproj perspective
+% camlight; lighting gouraud; alpha(0.75);
+% rotate3d on;
 
-for n=1:numClasses
-    range = (n-1)*10+1:n*10;
-    scatter3(embeddings(1,range),embeddings(2,range), embeddings(3,range), 60, 'filled'); axis equal;
+% for n=1:numClasses
+%     range = (n-1)*10+1:n*10;
+%     scatter3(embeddings(1,range),embeddings(2,range), embeddings(3,range), 60, 'filled'); axis equal;
     
-    drawnow;
-    pause;
-end
+%     drawnow;
+%     pause;
+% end
 
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-TX = DS.T;
-T_labels = DS.TL;
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TX = DS.T;
+% T_labels = DS.TL;
 
 
-hits = {};
-misses = {};
-accuracies = {};
-for alpha=1:numClasses
-    hits{alpha} = [];
-    misses{alpha} = [];
-    accuracies{alpha} = 0;
-end
+% hits = {};
+% misses = {};
+% accuracies = {};
+% for alpha=1:numClasses
+%     hits{alpha} = [];
+%     misses{alpha} = [];
+%     accuracies{alpha} = 0;
+% end
 
 
-if strcmp(param.algorithm, 'lme_sp') == 1 %% LME SINGLE-PROTOTYPE
-    accuracy = 0;
+% if strcmp(param.algorithm, 'lme_sp') == 1 %% LME SINGLE-PROTOTYPE
+%     accuracy = 0;
 
-    for n=1:size(TX, 2)
+%     for n=1:size(TX, 2)
         
-        q_i = TX(:, n);
-        [~, max_class] = max(q_i'*W'*U);
+%         q_i = TX(:, n);
+%         [~, max_class] = max(q_i'*W'*U);
 
-        if max_class == T_labels(n)
-            accuracy = accuracy + 1;
-            accuracies{max_class} = accuracies{max_class} + 1;
-            hits{max_class} = [hits{max_class} n];
-        else
-            % misses{max_class} = [misses{max_class} n];
-            misses{T_labels(n)} = [misses{T_labels(n)} n];
-        %     fprintf('%d th query is categorized as %d (ground truth: %d)\n', n, max_class, T_labels(n));
-        end
+%         if max_class == T_labels(n)
+%             accuracy = accuracy + 1;
+%             accuracies{max_class} = accuracies{max_class} + 1;
+%             hits{max_class} = [hits{max_class} n];
+%         else
+%             % misses{max_class} = [misses{max_class} n];
+%             misses{T_labels(n)} = [misses{T_labels(n)} n];
+%         %     fprintf('%d th query is categorized as %d (ground truth: %d)\n', n, max_class, T_labels(n));
+%         end
 
-        if mod(n, 1000) == 0
-            fprintf('.');
-        end
-    end
+%         if mod(n, 1000) == 0
+%             fprintf('.');
+%         end
+%     end
 
-    accuracy = double(accuracy) * 100 / size(T_labels, 1);
-    fprintf('accuracy : %f\n', accuracy);
+%     accuracy = double(accuracy) * 100 / size(T_labels, 1);
+%     fprintf('accuracy : %f\n', accuracy);
 
 
-    category_size = {};
-    for alpha=1:numClasses
-        category_size{alpha} = numel(find(T_labels == alpha));
-        accuracies{alpha} = double(accuracies{alpha}) * 100 / category_size{alpha};
-    end
+%     category_size = {};
+%     for alpha=1:numClasses
+%         category_size{alpha} = numel(find(T_labels == alpha));
+%         accuracies{alpha} = double(accuracies{alpha}) * 100 / category_size{alpha};
+%     end
    
 
-else %% OUR MODELS | LME MULTI-PROTOTYPE
-    accuracy = 0;
+% else %% OUR MODELS | LME MULTI-PROTOTYPE
+%     accuracy = 0;
 
-    for n=1:size(TX, 2)
+%     for n=1:size(TX, 2)
         
-        max_sim = -Inf;
-        max_class = -1;
-        q_i = TX(:, n);
+%         max_sim = -Inf;
+%         max_class = -1;
+%         q_i = TX(:, n);
 
-        for alpha=1:numClasses
-            UM = U*M{alpha};
-            sim = max(q_i'*W'*UM);
+%         for alpha=1:numClasses
+%             UM = U*M{alpha};
+%             sim = max(q_i'*W'*UM);
 
-            if max_sim < sim
-                max_sim = sim;
-                max_class = alpha;
-            end
-        end
+%             if max_sim < sim
+%                 max_sim = sim;
+%                 max_class = alpha;
+%             end
+%         end
 
-        if max_class == T_labels(n)
-            accuracy = accuracy + 1;
-            accuracies{max_class} = accuracies{max_class} + 1;
-            hits{max_class} = [hits{max_class} n];
-        else
-            % misses{max_class} = [misses{max_class} n];
-            misses{T_labels(n)} = [misses{T_labels(n)} n];
-        %     fprintf('%d th query is categorized as %d (ground truth: %d)\n', n, max_class, T_labels(n));
-        end
+%         if max_class == T_labels(n)
+%             accuracy = accuracy + 1;
+%             accuracies{max_class} = accuracies{max_class} + 1;
+%             hits{max_class} = [hits{max_class} n];
+%         else
+%             % misses{max_class} = [misses{max_class} n];
+%             misses{T_labels(n)} = [misses{T_labels(n)} n];
+%         %     fprintf('%d th query is categorized as %d (ground truth: %d)\n', n, max_class, T_labels(n));
+%         end
 
-        if mod(n, 1000) == 0
-            fprintf('.');
-        end
-    end
+%         if mod(n, 1000) == 0
+%             fprintf('.');
+%         end
+%     end
 
-    accuracy = double(accuracy) * 100 / size(T_labels, 1);
-    fprintf('accuracy : %f\n', accuracy);
-
-
-    category_size = {};
-    for alpha=1:numClasses
-        category_size{alpha} = numel(find(T_labels == alpha));
-        accuracies{alpha} = double(accuracies{alpha}) * 100 / category_size{alpha};
-    end
-end
+%     accuracy = double(accuracy) * 100 / size(T_labels, 1);
+%     fprintf('accuracy : %f\n', accuracy);
 
 
+%     category_size = {};
+%     for alpha=1:numClasses
+%         category_size{alpha} = numel(find(T_labels == alpha));
+%         accuracies{alpha} = double(accuracies{alpha}) * 100 / category_size{alpha};
+%     end
+% end
 
 
 
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Show Results %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-I = DS.TI;
 
-alpha = 3; % category
-target_imgs = misses{alpha};
-fig = figure;
-hold on;
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Show Results %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-set(fig, 'Position', [0, 0, 1500, 1200]);
+% I = DS.TI;
 
-numRows = 8;
-numCols = 10;
-for row=1:numRows
-    for col=1:numCols
-        pos_idx = (row-1)*numCols + col;
-        img_idx = target_imgs(pos_idx);
+% alpha = 3; % category
+% target_imgs = misses{alpha};
+% fig = figure;
+% hold on;
+
+% set(fig, 'Position', [0, 0, 1500, 1200]);
+
+% numRows = 8;
+% numCols = 10;
+% for row=1:numRows
+%     for col=1:numCols
+%         pos_idx = (row-1)*numCols + col;
+%         img_idx = target_imgs(pos_idx);
         
-        subplot(numRows, numCols, pos_idx);
-        imagesc(I{1, img_idx});
-        axis off;
-        axis image;
-    end
-end
-hold off;
+%         subplot(numRows, numCols, pos_idx);
+%         imagesc(I{1, img_idx});
+%         axis off;
+%         axis image;
+%     end
+% end
+% hold off;
 
-clear numRow, numCols;
+% clear numRow, numCols;
